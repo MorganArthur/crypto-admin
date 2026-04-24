@@ -33,6 +33,7 @@ export interface AnalyzeRequest {
   symbol: string;
   timeframe: string;
   use_deepseek: boolean;
+  model: string;
 }
 
 export interface SchedulerStartRequest {

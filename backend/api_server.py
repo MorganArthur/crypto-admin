@@ -267,7 +267,7 @@ def run_fetch_script(symbol: str, mode: str = "ohlcv", timeframe: Optional[str] 
         return {"success": False, "stdout": e.stdout, "stderr": e.stderr}
 
 
-def run_analyze_script(symbol: str, timeframe: str, use_deepseek: bool = False) -> dict:
+def run_analyze_script(symbol: str, timeframe: str, use_deepseek: bool = False, model: str = "deepseek-chat") -> dict:
     """调用 analyze_data.py 分析数据"""
     analyze_script = os.path.join(BACKEND_DIR, "analyze_data.py")
     cmd = [
@@ -278,6 +278,7 @@ def run_analyze_script(symbol: str, timeframe: str, use_deepseek: bool = False) 
     ]
     if use_deepseek:
         cmd.append("--deepseek")
+        cmd.extend(["--deepseek-model", model])
     try:
         result = subprocess.run(cmd, capture_output=True, text=True, check=True, cwd=BACKEND_DIR)
         return {"success": True, "stdout": result.stdout, "stderr": result.stderr}
@@ -296,6 +297,7 @@ class AnalyzeRequest(BaseModel):
     symbol: str = "BTC/USDT"
     timeframe: str = "1h"
     use_deepseek: bool = False
+    model: str = "deepseek-v4-flash"
 
 
 class SchedulerStartRequest(BaseModel):
@@ -394,7 +396,7 @@ def fetch_data(req: FetchRequest):
 @app.post("/api/analyze")
 def analyze_data(req: AnalyzeRequest):
     """手动触发数据分析"""
-    result = run_analyze_script(req.symbol, req.timeframe, req.use_deepseek)
+    result = run_analyze_script(req.symbol, req.timeframe, req.use_deepseek, req.model)
     return {"success": result["success"], "output": result["stdout"], "error": result["stderr"]}
 
 

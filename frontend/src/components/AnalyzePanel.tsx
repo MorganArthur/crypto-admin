@@ -34,6 +34,7 @@ function extractSymbolsFromFiles(files: { name: string }[]): string[] {
 const AnalyzePanel: React.FC = () => {
   const [symbol, setSymbol] = useState<string>("BTC/USDT");
   const [timeframe, setTimeframe] = useState<string>("1h");
+  const [model, setModel] = useState<string>("deepseek-v4-flash");
   const [analyzing, setAnalyzing] = useState(false);
   const [output, setOutput] = useState<string>("");
   const [error, setError] = useState<string>("");
@@ -83,7 +84,7 @@ const AnalyzePanel: React.FC = () => {
     setOutput("");
     setError("");
     try {
-      const res = await analyzeData({ symbol, timeframe, use_deepseek: true });
+      const res = await analyzeData({ symbol, timeframe, use_deepseek: true, model });
       setOutput(res.data.output || "分析完成，无输出");
       if (res.data.error) {
         setError(res.data.error);
@@ -123,6 +124,18 @@ const AnalyzePanel: React.FC = () => {
                   { label: "1小时", value: "1h" },
                   { label: "4小时", value: "4h" },
                   { label: "1天", value: "1d" },
+                ]}
+              />
+            </div>
+            <div>
+              <Text strong>模型:</Text>
+              <Select
+                value={model}
+                onChange={setModel}
+                style={{ width: 160, marginLeft: 8 }}
+                options={[
+                  { label: "deepseek-v4-flash", value: "deepseek-v4-flash" },
+                  { label: "deepseek-v4-pro", value: "deepseek-v4-pro" },
                 ]}
               />
             </div>
