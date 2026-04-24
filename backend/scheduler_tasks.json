@@ -1,0 +1,68 @@
+{
+  "tasks": [
+    {
+      "task_id": "b42aad14",
+      "symbols": [
+        "BTC/USDT",
+        "ETH/USDT",
+        "SOL/USDT",
+        "SUI/USDT",
+        "BNB/USDT",
+        "币安人生/USDT",
+        "DOGE/USDT"
+      ],
+      "mode": "ohlcv",
+      "timeframe": "1h",
+      "interval": 60,
+      "running": true
+    },
+    {
+      "task_id": "7c2bee75",
+      "symbols": [
+        "BTC/USDT",
+        "ETH/USDT",
+        "SOL/USDT",
+        "SUI/USDT",
+        "BNB/USDT",
+        "币安人生/USDT",
+        "DOGE/USDT"
+      ],
+      "mode": "ohlcv",
+      "timeframe": "4h",
+      "interval": 240,
+      "running": true
+    },
+    {
+      "task_id": "1650365e",
+      "symbols": [
+        "BTC/USDT",
+        "ETH/USDT",
+        "SOL/USDT",
+        "SUI/USDT",
+        "BNB/USDT",
+        "币安人生/USDT",
+        "DOGE/USDT"
+      ],
+      "mode": "ohlcv",
+      "timeframe": "1d",
+      "interval": 1440,
+      "running": true
+    },
+    {
+      "task_id": "68aabaf6",
+      "symbols": [
+        "BTC/USDT",
+        "ETH/USDT",
+        "SOL/USDT",
+        "SUI/USDT",
+        "BNB/USDT",
+        "币安人生/USDT",
+        "DOGE/USDT"
+      ],
+      "mode": "ticker",
+      "timeframe": "1h",
+      "interval": 60,
+      "running": true
+    }
+  ]
+}

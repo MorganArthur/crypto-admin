@@ -1,0 +1,8 @@
+﻿ccxt
+pandas
+numpy
+python-dotenv
+schedule
+fastapi
+uvicorn
+
