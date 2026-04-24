@@ -49,7 +49,8 @@ const SchedulerPanel: React.FC = () => {
   ]);
   const [mode, setMode] = useState<string>("ohlcv");
   const [timeframe, setTimeframe] = useState<string>("1h");
-  const [intervalMinutes, setIntervalMinutes] = useState<number>(60);
+  const [scheduleType, setScheduleType] = useState<string>("cron"); // "cron" 或 "interval"
+  const [scheduleValue, setScheduleValue] = useState<number>(1);
   const [symbolInput, setSymbolInput] = useState<string>("");
 
   const fetchTasks = async () => {
@@ -77,7 +78,7 @@ const SchedulerPanel: React.FC = () => {
     }
     setCreating(true);
     try {
-      const res = await schedulerCreate({ symbols, mode, timeframe, interval: intervalMinutes });
+      const res = await schedulerCreate({ symbols, mode, timeframe, schedule_type: scheduleType, schedule_value: scheduleValue });
       if (res.data.success) {
         message.success(`${res.data.message} (ID: ${res.data.task_id})`);
       } else {
@@ -197,15 +198,43 @@ const SchedulerPanel: React.FC = () => {
                 </div>
               )}
               <div>
-                <Text strong>间隔(分钟):</Text>
-                <InputNumber
-                  min={1}
-                  max={1440}
-                  value={intervalMinutes}
-                  onChange={(v) => setIntervalMinutes(v || 60)}
-                  style={{ width: 100, marginLeft: 8 }}
+                <Text strong>调度方式:</Text>
+                <Select
+                  value={scheduleType}
+                  onChange={setScheduleType}
+                  style={{ width: 140, marginLeft: 8 }}
+                  options={[
+                    { label: "整点调度", value: "cron" },
+                    { label: "分钟间隔", value: "interval" },
+                  ]}
                 />
               </div>
+              {scheduleType === "cron" ? (
+                <div>
+                  <Text strong>执行频率:</Text>
+                  <Select
+                    value={scheduleValue}
+                    onChange={(v) => setScheduleValue(v)}
+                    style={{ width: 160, marginLeft: 8 }}
+                    options={[
+                      { label: "每小时整点", value: 1 },
+                      { label: "每4小时整点", value: 4 },
+                      { label: "每天00:00整点", value: 24 },
+                    ]}
+                  />
+                </div>
+              ) : (
+                <div>
+                  <Text strong>间隔(分钟):</Text>
+                  <InputNumber
+                    min={1}
+                    max={1440}
+                    value={scheduleValue}
+                    onChange={(v) => setScheduleValue(v || 60)}
+                    style={{ width: 100, marginLeft: 8 }}
+                  />
+                </div>
+              )}
             </Space>
 
             <Space>
@@ -272,7 +301,20 @@ const SchedulerPanel: React.FC = () => {
               >
                 <div style={{ marginBottom: 8 }}>
                   <Text type="secondary">
-                    每 <strong>{task.config.interval}</strong> 分钟更新{" "}
+                    {(() => {
+                      const st = task.config.schedule_type || (task.config.interval ? "interval" : "cron");
+                      const sv = task.config.schedule_value || task.config.interval || 1;
+                      if (st === "interval") {
+                        // 兼容旧版：显示为分钟
+                        return `每 ${sv} 分钟`;
+                      }
+                      // cron 模式：按小时显示
+                      if (sv === 1) return "每小时整点";
+                      if (sv === 4) return "每4小时整点";
+                      if (sv === 24) return "每天00:00整点";
+                      return `每${sv}小时整点`;
+                    })()}
+                    {" "}更新{" "}
                     <strong>{task.config.symbols.join(", ")}</strong> 的{" "}
                     <strong>{task.config.mode?.toUpperCase?.() || "OHLCV"}</strong>
                     {task.config.mode === "ohlcv" && (

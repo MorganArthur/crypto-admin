@@ -76,6 +76,8 @@ class SchedulerManager:
         scheduler = schedule.Scheduler()
         mode = self._config.get("mode", "ohlcv")
         timeframe = self._config.get("timeframe", "1h")
+        schedule_type = self._config.get("schedule_type", "interval")
+        schedule_value = self._config.get("schedule_value", 60)
 
         def job():
             self._add_log(f"定时任务执行: {self._config['symbols']} [{mode}]")
@@ -85,8 +87,25 @@ class SchedulerManager:
                 result = run_fetch_script(symbol, mode, timeframe if mode == "ohlcv" else None)
                 self._add_log(f"  {symbol} 结果: {'成功' if result.get('success') else '失败'}")
 
-        scheduler.every(self._config["interval"]).minutes.do(job)
-        self._add_log(f"调度器已启动: 每 {self._config['interval']} 分钟更新 {self._config['symbols']} [{mode}]")
+        # 根据调度类型设置定时任务
+        if schedule_type == "cron":
+            # cron 模式：按整点调度
+            if schedule_value == 1:
+                scheduler.every().hour.at(":00").do(job)
+                self._add_log(f"调度器已启动: 每小时整点更新 {self._config['symbols']} [{mode}]")
+            elif schedule_value == 4:
+                scheduler.every(4).hours.at(":00").do(job)
+                self._add_log(f"调度器已启动: 每4小时整点更新 {self._config['symbols']} [{mode}]")
+            elif schedule_value == 24:
+                scheduler.every().day.at("00:00").do(job)
+                self._add_log(f"调度器已启动: 每天00:00整点更新 {self._config['symbols']} [{mode}]")
+            else:
+                scheduler.every(schedule_value).hours.at(":00").do(job)
+                self._add_log(f"调度器已启动: 每{schedule_value}小时整点更新 {self._config['symbols']} [{mode}]")
+        else:
+            # interval 模式：兼容旧版的分钟间隔
+            scheduler.every(schedule_value).minutes.do(job)
+            self._add_log(f"调度器已启动: 每 {schedule_value} 分钟更新 {self._config['symbols']} [{mode}]")
 
         while not self._stop_event.is_set():
             scheduler.run_pending()
@@ -95,7 +114,7 @@ class SchedulerManager:
         self._add_log("调度器线程已退出")
         self._running = False
 
-    def start(self, symbols: List[str], mode: str, timeframe: str, interval: int) -> dict:
+    def start(self, symbols: List[str], mode: str, timeframe: str, schedule_type: str = "cron", schedule_value: int = 1) -> dict:
         if self._running:
             return {"success": False, "message": "定时任务已在运行中"}
 
@@ -103,7 +122,8 @@ class SchedulerManager:
             "symbols": symbols,
             "mode": mode,
             "timeframe": timeframe,
-            "interval": interval,
+            "schedule_type": schedule_type,
+            "schedule_value": schedule_value,
         }
         self._stop_event.clear()
         self._thread = threading.Thread(target=self._run_scheduler, daemon=True)
@@ -144,7 +164,8 @@ class TaskRegistry:
                     "symbols": task._config["symbols"],
                     "mode": task._config.get("mode", "ohlcv"),
                     "timeframe": task._config["timeframe"],
-                    "interval": task._config["interval"],
+                    "schedule_type": task._config.get("schedule_type", "cron"),
+                    "schedule_value": task._config.get("schedule_value", 1),
                     "running": task._running,
                 })
         try:
@@ -166,7 +187,8 @@ class TaskRegistry:
                     "symbols": item["symbols"],
                     "mode": item.get("mode", "ohlcv"),
                     "timeframe": item["timeframe"],
-                    "interval": item["interval"],
+                    "schedule_type": item.get("schedule_type", "cron"),
+                    "schedule_value": item.get("schedule_value", item.get("interval", 60)),
                 }
                 if item.get("running", False):
                     task._stop_event.clear()
@@ -180,10 +202,10 @@ class TaskRegistry:
         except Exception as e:
             print(f"[TaskRegistry] 加载任务配置失败: {e}")
 
-    def create(self, symbols: List[str], mode: str, timeframe: str, interval: int) -> dict:
+    def create(self, symbols: List[str], mode: str, timeframe: str, schedule_type: str = "cron", schedule_value: int = 1) -> dict:
         task_id = str(uuid.uuid4())[:8]
         task = SchedulerManager(task_id)
-        result = task.start(symbols, mode, timeframe, interval)
+        result = task.start(symbols, mode, timeframe, schedule_type, schedule_value)
         if result["success"]:
             with self._lock:
                 self._tasks[task_id] = task
@@ -280,7 +302,8 @@ class SchedulerStartRequest(BaseModel):
     symbols: List[str] = ["BTC/USDT"]
     mode: str = "ohlcv"
     timeframe: str = "1h"
-    interval: int = 60  # 分钟
+    schedule_type: str = "cron"  # "cron" 或 "interval"
+    schedule_value: int = 1  # cron模式下：1=每小时, 4=每4小时, 24=每天; interval模式下：分钟数
 
 
 class BacktestRequest(BaseModel):
@@ -380,7 +403,7 @@ def analyze_data(req: AnalyzeRequest):
 @app.post("/api/scheduler/tasks")
 def scheduler_create(req: SchedulerStartRequest):
     """创建并启动新的定时任务"""
-    return task_registry.create(req.symbols, req.mode, req.timeframe, req.interval)
+    return task_registry.create(req.symbols, req.mode, req.timeframe, req.schedule_type, req.schedule_value)
 
 
 @app.post("/api/scheduler/tasks/{task_id}/stop")
