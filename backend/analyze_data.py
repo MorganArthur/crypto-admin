@@ -637,7 +637,7 @@ def generate_prompt(data: dict) -> str:
     return prompt
 
 
-def call_deepseek(prompt: str, api_key: str = None, model: str = "deepseek-reasoner") -> dict:
+def call_deepseek(prompt: str, api_key: str = None, model: str = "deepseek-v4-flash") -> dict:
     """调用 DeepSeek API 获取交易建议"""
     if api_key is None:
         api_key = os.environ.get("DEEPSEEK_API_KEY", "")

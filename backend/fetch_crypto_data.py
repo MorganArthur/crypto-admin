@@ -108,10 +108,11 @@ def fetch_tickers(symbol: Optional[str] = None) -> pd.DataFrame:
     return df
 
 
-def fetch_ohlcv(symbol: str, timeframe: str = '1h') -> pd.DataFrame:
+def fetch_ohlcv(symbol: str, timeframe: str = '1h', since: Optional[int] = None) -> pd.DataFrame:
     """
     获取 K线/OHLCV 数据
     :param timeframe: 时间周期, 如 '1m', '5m', '15m', '1h', '4h', '1d', '1w'
+    :param since: 起始时间戳（毫秒），若提供则从该时间开始获取数据（支持分页）
     """
     exchange = ccxt.binance({'enableRateLimit': True})
     exchange.load_markets()
@@ -119,7 +120,22 @@ def fetch_ohlcv(symbol: str, timeframe: str = '1h') -> pd.DataFrame:
     if symbol not in exchange.symbols:
         raise ValueError(f"交易所 binance 不支持交易对 {symbol}")
 
-    ohlcv = exchange.fetch_ohlcv(symbol, timeframe=timeframe, limit=1000)
+    if since is None:
+        ohlcv = exchange.fetch_ohlcv(symbol, timeframe=timeframe, limit=1000)
+    else:
+        # 分页获取，从 since 时间开始拉取到最新
+        all_ohlcv = []
+        current_since = since
+        while True:
+            batch = exchange.fetch_ohlcv(symbol, timeframe=timeframe, limit=1000, since=current_since)
+            if not batch:
+                break
+            all_ohlcv.extend(batch)
+            if len(batch) < 1000:
+                break
+            # 使用最后一条时间戳 + 1ms 作为下一页起点，避免重复
+            current_since = batch[-1][0] + 1
+        ohlcv = all_ohlcv
 
     df = pd.DataFrame(ohlcv, columns=['时间戳', '开盘价', '最高价', '最低价', '收盘价', '成交量'])
     df['时间'] = pd.to_datetime(df['时间戳'], unit='ms')
@@ -241,9 +257,25 @@ def main():
         print(f"共获取 {len(df)} 条行情数据")
 
     elif args.mode == 'ohlcv':
+        # 若本地已有数据，读取最新时间戳作为同步起点
+        since = None
+        filepath = os.path.join(DATA_DIR, filename)
+        if os.path.exists(filepath):
+            try:
+                existing_df = pd.read_csv(filepath)
+                if not existing_df.empty and '时间戳' in existing_df.columns:
+                    last_ts = int(existing_df['时间戳'].max())
+                    since = last_ts + 1  # 加 1ms 避免重复获取最后一条
+                    print(f"[i] 本地数据最新时间: {pd.to_datetime(last_ts, unit='ms')}，将从该时间点继续同步")
+            except Exception as e:
+                print(f"[WARN] 读取本地历史数据失败，将全量获取: {e}")
+
         print(f"正在从 binance 获取 {args.symbol} 的 {args.timeframe} K线数据 ...")
-        df = fetch_ohlcv(args.symbol, args.timeframe)
-        save_csv(df, filename, append=True, dedup_cols=['时间戳'])
+        df = fetch_ohlcv(args.symbol, args.timeframe, since=since)
+        if df.empty:
+            print("[i] 无新增数据，无需更新")
+        else:
+            save_csv(df, filename, append=True, dedup_cols=['时间戳'])
         print(f"共获取 {len(df)} 条 K线数据")
 
     elif args.mode == 'orderbook':

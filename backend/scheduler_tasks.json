@@ -63,6 +63,38 @@
       "timeframe": "1h",
       "interval": 60,
       "running": true
+    },
+    {
+      "task_id": "822ee8fe",
+      "symbols": [
+        "BTC/USDT",
+        "ETH/USDT",
+        "SOL/USDT",
+        "SUI/USDT",
+        "BNB/USDT",
+        "币安人生/USDT",
+        "DOGE/USDT"
+      ],
+      "mode": "orderbook",
+      "timeframe": "1h",
+      "interval": 60,
+      "running": true
+    },
+    {
+      "task_id": "41cd527e",
+      "symbols": [
+        "BTC/USDT",
+        "ETH/USDT",
+        "SOL/USDT",
+        "SUI/USDT",
+        "BNB/USDT",
+        "币安人生/USDT",
+        "DOGE/USDT"
+      ],
+      "mode": "trades",
+      "timeframe": "1h",
+      "interval": 60,
+      "running": true
     }
   ]
 }

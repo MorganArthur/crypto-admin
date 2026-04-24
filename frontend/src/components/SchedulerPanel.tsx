@@ -232,6 +232,8 @@ const SchedulerPanel: React.FC = () => {
             <Col xs={24} md={12} lg={8} key={task.task_id}>
               <Card
                 size="small"
+                style={{ height: "100%", display: "flex", flexDirection: "column" }}
+                bodyStyle={{ flex: 1, display: "flex", flexDirection: "column" }}
                 title={
                   <Space>
                     <span>任务 {task.task_id}</span>
@@ -282,13 +284,14 @@ const SchedulerPanel: React.FC = () => {
 
                 <div
                   style={{
+                    flex: 1,
                     background: "#f6f8fa",
                     padding: 10,
                     borderRadius: 4,
-                    maxHeight: 200,
                     overflow: "auto",
                     fontFamily: "monospace",
                     fontSize: 12,
+                    minHeight: 140,
                   }}
                 >
                   {task.logs.length > 0 ? (
