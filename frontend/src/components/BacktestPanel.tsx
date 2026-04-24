@@ -212,8 +212,8 @@ const BacktestPanel: React.FC = () => {
     : [];
 
   const tradeColumns = [
-    { title: "开仓时间", dataIndex: "entry_time", key: "entry_time", width: 180 },
-    { title: "平仓时间", dataIndex: "exit_time", key: "exit_time", width: 180 },
+    { title: "开仓时间", dataIndex: "entry_time", key: "entry_time" },
+    { title: "平仓时间", dataIndex: "exit_time", key: "exit_time" },
     {
       title: "方向",
       dataIndex: "direction",
@@ -255,7 +255,7 @@ const BacktestPanel: React.FC = () => {
   ];
 
   return (
-    <div>
+    <div style={{ display: 'flex', flexDirection: 'column', height: '100%' }}>
       <Title level={4}>
         <LineChartOutlined /> 策略回测
       </Title>
@@ -341,14 +341,14 @@ const BacktestPanel: React.FC = () => {
             </div>
           </Space>
 
-          <div>
-            <Text strong style={{ marginRight: 8 }}>
-              策略参数:
-            </Text>
-            {renderParamInputs()}
-          </div>
+          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: 12 }}>
+            <div>
+              <Text strong style={{ marginRight: 8 }}>
+                策略参数:
+              </Text>
+              {renderParamInputs()}
+            </div>
 
-          <div>
             <Button
               type="primary"
               icon={<PlayCircleOutlined />}
@@ -372,75 +372,76 @@ const BacktestPanel: React.FC = () => {
         />
       )}
 
-      <Spin spinning={loading}>
-        {result && (
-          <div>
-            <Row gutter={[16, 16]} style={{ marginBottom: 16 }}>
-              {statCards.map((card) => (
-                <Col xs={12} sm={8} md={6} lg={6} xl={3} key={card.title}>
-                  <Card size="small">
-                    <Statistic
-                      title={card.title}
-                      value={card.value}
-                      suffix={card.suffix}
-                      valueStyle={{ color: card.color }}
-                      precision={2}
-                    />
-                  </Card>
-                </Col>
-              ))}
-            </Row>
+      <div style={{ flex: 1, overflowY: 'auto', overflowX: 'hidden' }}>
+        <Spin spinning={loading}>
+          {result && (
+            <div>
+              <Row gutter={[16, 16]} style={{ marginBottom: 16 }}>
+                {statCards.map((card) => (
+                  <Col xs={12} sm={8} md={6} lg={6} xl={3} key={card.title}>
+                    <Card size="small">
+                      <Statistic
+                        title={card.title}
+                        value={card.value}
+                        suffix={card.suffix}
+                        valueStyle={{ color: card.color }}
+                        precision={2}
+                      />
+                    </Card>
+                  </Col>
+                ))}
+              </Row>
 
-            <Card title="权益曲线" style={{ marginBottom: 16 }}>
-              {result.equity_curve.length > 0 ? (
-                <ResponsiveContainer width="100%" height={400}>
-                  <AreaChart data={result.equity_curve}>
-                    <defs>
-                      <linearGradient id="colorEquity" x1="0" y1="0" x2="0" y2="1">
-                        <stop offset="5%" stopColor="#1890ff" stopOpacity={0.3} />
-                        <stop offset="95%" stopColor="#1890ff" stopOpacity={0} />
-                      </linearGradient>
-                    </defs>
-                    <CartesianGrid strokeDasharray="3 3" />
-                    <XAxis
-                      dataKey="time"
-                      tickFormatter={(val: string) => val.slice(5, 16)}
-                      minTickGap={30}
-                    />
-                    <YAxis domain={["auto", "auto"]} />
-                    <Tooltip
-                      formatter={(value) => [Number(value).toFixed(2), "权益"]}
-                      labelFormatter={(label) => String(label)}
-                    />
-                    <Legend />
-                    <Area
-                      type="monotone"
-                      dataKey="equity"
-                      stroke="#1890ff"
-                      fillOpacity={1}
-                      fill="url(#colorEquity)"
-                      dot={false}
-                      name="权益"
-                    />
-                  </AreaChart>
-                </ResponsiveContainer>
-              ) : (
-                <Empty description="无权益曲线数据" />
-              )}
-            </Card>
+              <Card title="权益曲线" style={{ marginBottom: 16 }}>
+                {result.equity_curve.length > 0 ? (
+                  <ResponsiveContainer width="100%" height={400}>
+                    <AreaChart data={result.equity_curve}>
+                      <defs>
+                        <linearGradient id="colorEquity" x1="0" y1="0" x2="0" y2="1">
+                          <stop offset="5%" stopColor="#1890ff" stopOpacity={0.3} />
+                          <stop offset="95%" stopColor="#1890ff" stopOpacity={0} />
+                        </linearGradient>
+                      </defs>
+                      <CartesianGrid strokeDasharray="3 3" />
+                      <XAxis
+                        dataKey="time"
+                        tickFormatter={(val: string) => val.slice(5, 16)}
+                        minTickGap={30}
+                      />
+                      <YAxis domain={["auto", "auto"]} />
+                      <Tooltip
+                        formatter={(value) => [Number(value).toFixed(2), "权益"]}
+                        labelFormatter={(label) => String(label)}
+                      />
+                      <Legend />
+                      <Area
+                        type="monotone"
+                        dataKey="equity"
+                        stroke="#1890ff"
+                        fillOpacity={1}
+                        fill="url(#colorEquity)"
+                        dot={false}
+                        name="权益"
+                      />
+                    </AreaChart>
+                  </ResponsiveContainer>
+                ) : (
+                  <Empty description="无权益曲线数据" />
+                )}
+              </Card>
 
-            <Card title="交易记录">
-              <Table
-                dataSource={result.trades.map((t, idx) => ({ ...t, key: idx }))}
-                columns={tradeColumns}
-                pagination={{ pageSize: 10 }}
-                size="small"
-                scroll={{ x: "max-content" }}
-              />
-            </Card>
-          </div>
-        )}
-      </Spin>
+              <Card title="交易记录">
+                <Table
+                  dataSource={result.trades.map((t, idx) => ({ ...t, key: idx }))}
+                  columns={tradeColumns}
+                  pagination={{ pageSize: 10 }}
+                  size="small"
+                />
+              </Card>
+            </div>
+          )}
+        </Spin>
+      </div>
     </div>
   );
 };

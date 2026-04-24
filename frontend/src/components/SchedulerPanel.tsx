@@ -134,7 +134,7 @@ const SchedulerPanel: React.FC = () => {
   };
 
   return (
-    <div>
+    <div style={{ display: 'flex', flexDirection: 'column', height: '100%' }}>
       <Title level={4}>
         <ClockCircleOutlined /> 定时任务
       </Title>
@@ -254,109 +254,112 @@ const SchedulerPanel: React.FC = () => {
         </Space>
       </Card>
 
-      <Spin spinning={loading}>
-        <Title level={5}>任务列表 ({tasks.length})</Title>
-        <Row gutter={[16, 16]}>
-          {tasks.map((task) => (
-            <Col xs={24} md={12} lg={8} key={task.task_id}>
-              <Card
-                size="small"
-                style={{ height: "100%", display: "flex", flexDirection: "column" }}
-                bodyStyle={{ flex: 1, display: "flex", flexDirection: "column" }}
-                title={
-                  <Space>
-                    <span>任务 {task.task_id}</span>
-                    {task.running ? (
-                      <Tag color="green">运行中</Tag>
-                    ) : (
-                      <Tag color="red">已停止</Tag>
-                    )}
-                  </Space>
-                }
-                extra={
-                  <Space>
-                    {task.running && (
-                      <Button
-                        size="small"
-                        danger
-                        icon={<PauseCircleOutlined />}
-                        onClick={() => handleStop(task.task_id)}
+      <div style={{ flex: 1, overflowY: 'auto', overflowX: 'hidden' }}>
+        <Spin spinning={loading}>
+          <Title level={5}>任务列表 ({tasks.length})</Title>
+          <Row gutter={[16, 16]}>
+            {tasks.map((task) => (
+              <Col xs={24} md={12} lg={8} key={task.task_id}>
+                <Card
+                  size="small"
+                  style={{ height: "100%", display: "flex", flexDirection: "column" }}
+                  bodyStyle={{ flex: 1, display: "flex", flexDirection: "column" }}
+                  title={
+                    <Space>
+                      <span>任务 {task.task_id}</span>
+                      {task.running ? (
+                        <Tag color="green">运行中</Tag>
+                      ) : (
+                        <Tag color="red">已停止</Tag>
+                      )}
+                    </Space>
+                  }
+                  extra={
+                    <Space>
+                      {task.running && (
+                        <Button
+                          size="small"
+                          danger
+                          icon={<PauseCircleOutlined />}
+                          onClick={() => handleStop(task.task_id)}
+                        >
+                          停止
+                        </Button>
+                      )}
+                      <Popconfirm
+                        title="确认删除?"
+                        description="删除后任务将不可恢复"
+                        onConfirm={() => handleDelete(task.task_id)}
+                        okText="删除"
+                        cancelText="取消"
                       >
-                        停止
-                      </Button>
-                    )}
-                    <Popconfirm
-                      title="确认删除?"
-                      description="删除后任务将不可恢复"
-                      onConfirm={() => handleDelete(task.task_id)}
-                      okText="删除"
-                      cancelText="取消"
-                    >
-                      <Button size="small" icon={<DeleteOutlined />}>
-                        删除
-                      </Button>
-                    </Popconfirm>
-                  </Space>
-                }
-              >
-                <div style={{ marginBottom: 8 }}>
-                  <Text type="secondary">
-                    {(() => {
-                      const st = task.config.schedule_type || (task.config.interval ? "interval" : "cron");
-                      const sv = task.config.schedule_value || task.config.interval || 1;
-                      if (st === "interval") {
-                        // 兼容旧版：显示为分钟
-                        return `每 ${sv} 分钟`;
-                      }
-                      // cron 模式：按小时显示
-                      if (sv === 1) return "每小时整点";
-                      if (sv === 4) return "每4小时整点";
-                      if (sv === 24) return "每天00:00整点";
-                      return `每${sv}小时整点`;
-                    })()}
-                    {" "}更新{" "}
-                    <strong>{task.config.symbols.join(", ")}</strong> 的{" "}
-                    <strong>{task.config.mode?.toUpperCase?.() || "OHLCV"}</strong>
-                    {task.config.mode === "ohlcv" && (
-                      <span> <strong>{task.config.timeframe}</strong></span>
-                    )}{" "}
-                    数据
-                  </Text>
-                </div>
-
-                <div
-                  style={{
-                    flex: 1,
-                    background: "#f6f8fa",
-                    padding: 10,
-                    borderRadius: 4,
-                    overflow: "auto",
-                    fontFamily: "monospace",
-                    fontSize: 12,
-                    minHeight: 140,
-                  }}
+                        <Button size="small" icon={<DeleteOutlined />}>
+                          删除
+                        </Button>
+                      </Popconfirm>
+                    </Space>
+                  }
                 >
-                  {task.logs.length > 0 ? (
-                    <List
-                      dataSource={[...task.logs].reverse()}
-                      renderItem={(log) => <div>{log}</div>}
-                      size="small"
-                    />
-                  ) : (
-                    <Text type="secondary">暂无日志</Text>
-                  )}
-                </div>
-              </Card>
-            </Col>
-          ))}
-        </Row>
+                  <div style={{ marginBottom: 8 }}>
+                    <Text type="secondary">
+                      {(() => {
+                        const st = task.config.schedule_type || (task.config.interval ? "interval" : "cron");
+                        const sv = task.config.schedule_value || task.config.interval || 1;
+                        if (st === "interval") {
+                          // 兼容旧版：显示为分钟
+                          return `每 ${sv} 分钟`;
+                        }
+                        // cron 模式：按小时显示
+                        if (sv === 1) return "每小时整点";
+                        if (sv === 4) return "每4小时整点";
+                        if (sv === 24) return "每天00:00整点";
+                        return `每${sv}小时整点`;
+                      })()}
+                      {" "}更新{" "}
+                      <strong>{task.config.symbols.join(", ")}</strong> 的{" "}
+                      <strong>{task.config.mode?.toUpperCase?.() || "OHLCV"}</strong>
+                      {task.config.mode === "ohlcv" && (
+                        <span> <strong>{task.config.timeframe}</strong></span>
+                      )}{" "}
+                      数据
+                    </Text>
+                  </div>
 
-        {tasks.length === 0 && (
-          <Card style={{ marginTop: 16 }}>
-            <Text type="secondary">暂无定时任务，请在上方添加</Text>
-          </Card>
-        )}
-      </Spin>
+                  <div
+                    style={{
+                      flex: 1,
+                      background: "#f6f8fa",
+                      padding: 10,
+                      borderRadius: 4,
+                      overflowY: "auto",
+                      overflowX: "hidden",
+                      fontFamily: "monospace",
+                      fontSize: 12,
+                      minHeight: 140,
+                    }}
+                  >
+                    {task.logs.length > 0 ? (
+                      <List
+                        dataSource={[...task.logs].reverse()}
+                        renderItem={(log) => <div>{log}</div>}
+                        size="small"
+                      />
+                    ) : (
+                      <Text type="secondary">暂无日志</Text>
+                    )}
+                  </div>
+                </Card>
+              </Col>
+            ))}
+          </Row>
+
+          {tasks.length === 0 && (
+            <Card style={{ marginTop: 16 }}>
+              <Text type="secondary">暂无定时任务，请在上方添加</Text>
+            </Card>
+          )}
+        </Spin>
+      </div>
     </div>
   );
 };

@@ -35,7 +35,7 @@ function App() {
   }
 
   return (
-    <Layout style={{ minHeight: '100vh' }}>
+    <Layout style={{ height: '100vh' }}>
       <Sider theme="light" width={220} style={{ borderRight: '1px solid #f0f0f0' }}>
         <div style={{ padding: '16px', borderBottom: '1px solid #f0f0f0' }}>
           <Title level={5} style={{ margin: 0 }}>Crypto Admin</Title>
@@ -68,8 +68,8 @@ function App() {
           ]}
         />
       </Sider>
-      <Layout>
-        <Content style={{ padding: 24, background: '#fff' }}>
+      <Layout style={{ display: 'flex', flexDirection: 'column' }}>
+        <Content style={{ padding: 24, background: '#fff', display: 'flex', flexDirection: 'column', overflow: 'hidden' }}>
           {renderContent()}
         </Content>
       </Layout>

@@ -6,7 +6,6 @@ import {
   message,
   Typography,
   Space,
-  Spin,
   Alert,
   Tag,
 } from "antd";
@@ -97,7 +96,7 @@ const AnalyzePanel: React.FC = () => {
   };
 
   return (
-    <div>
+    <div style={{ display: 'flex', flexDirection: 'column', height: '100%' }}>
       <Title level={4}>
         <BarChartOutlined /> 数据分析
       </Title>
@@ -150,7 +149,7 @@ const AnalyzePanel: React.FC = () => {
         />
       )}
 
-      <Spin spinning={analyzing}>
+      <div style={{ flex: 1, overflow: 'hidden' }}>
         <Card
           title="输出结果"
           extra={
@@ -167,6 +166,9 @@ const AnalyzePanel: React.FC = () => {
               </Button>
             ) : null
           }
+          loading={analyzing}
+          style={{ height: '100%', display: 'flex', flexDirection: 'column' }}
+          styles={{ body: { flex: 1, overflow: 'auto' } }}
         >
           {output ? (
             <div>
@@ -243,8 +245,6 @@ const AnalyzePanel: React.FC = () => {
                   wordWrap: "break-word",
                   fontFamily: "monospace",
                   fontSize: 13,
-                  maxHeight: 600,
-                  overflow: "auto",
                   margin: 0,
                 }}
               >
@@ -255,7 +255,7 @@ const AnalyzePanel: React.FC = () => {
             <Text type="secondary">点击上方按钮执行操作，结果将显示在这里</Text>
           )}
         </Card>
-      </Spin>
+      </div>
     </div>
   );
 };

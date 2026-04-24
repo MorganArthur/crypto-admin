@@ -90,7 +90,7 @@ const DataView: React.FC = () => {
     })) || [];
 
   return (
-    <div>
+    <div style={{ display: 'flex', flexDirection: 'column', height: '100%' }}>
       <Title level={4}>
         <DatabaseOutlined /> 数据查看
       </Title>
@@ -134,19 +134,21 @@ const DataView: React.FC = () => {
         )}
       </Card>
 
-      <Spin spinning={loadingData}>
-        {fileData && (
-          <Card>
-            <Table
-              dataSource={fileData.data.map((row, idx) => ({ ...row, key: idx }))}
-              columns={columns}
-              pagination={{ pageSize: 20 }}
-              scroll={{ x: "max-content" }}
-              size="small"
-            />
-          </Card>
-        )}
-      </Spin>
+      <div style={{ flex: 1, overflow: 'auto' }}>
+        <Spin spinning={loadingData}>
+          {fileData && (
+            <Card>
+              <Table
+                dataSource={fileData.data.map((row, idx) => ({ ...row, key: idx }))}
+                columns={columns}
+                pagination={{ pageSize: 20 }}
+                scroll={{ x: "max-content" }}
+                size="small"
+              />
+            </Card>
+          )}
+        </Spin>
+      </div>
     </div>
   );
 };
