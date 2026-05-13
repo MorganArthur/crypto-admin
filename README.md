@@ -69,6 +69,17 @@ crypto-admin/
 
 ## 快速开始
 
+### 方式一：一键启动（推荐）
+
+**Windows用户**：直接双击运行以下任一文件即可自动启动所有服务：
+- `start.bat` - Basic startup script (English)
+- `start-full.bat` - Full startup with environment check (English)
+
+- **Stop services**: Double-click `stop.bat`
+- **Detailed instructions**: See [STARTUP.md](STARTUP.md) or [SCRIPTS_README.md](SCRIPTS_README.md)
+
+### 方式二：手动启动
+
 ### 1. 克隆项目
 
 ```bash
