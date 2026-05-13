@@ -34,7 +34,8 @@ DATA_DIR = os.path.join(BACKEND_DIR, "data")
 
 # 导入回测引擎
 sys.path.insert(0, BACKEND_DIR)
-from backtest_engine import BacktestEngine, create_strategy, get_strategy_names, get_strategy_info
+from backtest_engine import BacktestEngine, create_strategy, get_strategy_names, get_strategy_info, add_custom_strategy, update_custom_strategy, delete_custom_strategy
+from futures_backtest_engine import FuturesBacktestEngine
 
 app = FastAPI(title="Crypto Admin API", version="1.0.0")
 
@@ -243,6 +244,33 @@ class TaskRegistry:
             task = self._tasks.get(task_id)
         return task.status() if task else None
 
+    def execute_now(self, task_id: str) -> dict:
+        """立即执行一次任务"""
+        with self._lock:
+            task = self._tasks.get(task_id)
+        if not task:
+            return {"success": False, "message": "任务不存在"}
+        
+        # 在后台线程中执行任务
+        def run_task():
+            mode = task._config.get("mode", "ohlcv")
+            timeframe = task._config.get("timeframe", "1h")
+            task._add_log(f"手动触发立即执行: {task._config['symbols']} [{mode}]")
+            for symbol in task._config["symbols"]:
+                result = run_fetch_script(symbol, mode, timeframe if mode == "ohlcv" else None)
+                if result.get('success'):
+                    task._add_log(f"  {symbol} 结果: 成功")
+                else:
+                    error_msg = result.get('stderr', '').strip()
+                    task._add_log(f"  {symbol} 结果: 失败")
+                    if error_msg:
+                        task._add_log(f"  错误信息: {error_msg}")
+            task._add_log("立即执行完成")
+        
+        thread = threading.Thread(target=run_task, daemon=True)
+        thread.start()
+        return {"success": True, "message": "任务已开始执行"}
+
 
 task_registry = TaskRegistry()
 
@@ -252,8 +280,10 @@ task_registry = TaskRegistry()
 def run_fetch_script(symbol: str, mode: str = "ohlcv", timeframe: Optional[str] = None) -> dict:
     """调用 fetch_crypto_data.py 获取数据"""
     fetch_script = os.path.join(BACKEND_DIR, "fetch_crypto_data.py")
+    # 使用当前 Python 解释器路径（确保使用虚拟环境）
+    python_path = sys.executable
     cmd = [
-        sys.executable,
+        python_path,
         fetch_script,
         "--mode", mode,
         "--symbol", symbol,
@@ -261,7 +291,10 @@ def run_fetch_script(symbol: str, mode: str = "ohlcv", timeframe: Optional[str] 
     if mode == "ohlcv" and timeframe:
         cmd.extend(["--timeframe", timeframe])
     try:
-        result = subprocess.run(cmd, capture_output=True, text=True, check=True, cwd=BACKEND_DIR)
+        # 设置环境变量，确保子进程使用当前虚拟环境
+        env = os.environ.copy()
+        env["PYTHONPATH"] = BACKEND_DIR
+        result = subprocess.run(cmd, capture_output=True, text=True, check=True, cwd=BACKEND_DIR, env=env)
         return {"success": True, "stdout": result.stdout, "stderr": result.stderr}
     except subprocess.CalledProcessError as e:
         return {"success": False, "stdout": e.stdout, "stderr": e.stderr}
@@ -270,8 +303,10 @@ def run_fetch_script(symbol: str, mode: str = "ohlcv", timeframe: Optional[str] 
 def run_analyze_script(symbol: str, timeframe: str, use_deepseek: bool = False, model: str = "deepseek-chat") -> dict:
     """调用 analyze_data.py 分析数据"""
     analyze_script = os.path.join(BACKEND_DIR, "analyze_data.py")
+    # 使用当前 Python 解释器路径（确保使用虚拟环境）
+    python_path = sys.executable
     cmd = [
-        sys.executable,
+        python_path,
         analyze_script,
         "--symbol", symbol,
         "--timeframe", timeframe,
@@ -280,7 +315,10 @@ def run_analyze_script(symbol: str, timeframe: str, use_deepseek: bool = False, 
         cmd.append("--deepseek")
         cmd.extend(["--deepseek-model", model])
     try:
-        result = subprocess.run(cmd, capture_output=True, text=True, check=True, cwd=BACKEND_DIR)
+        # 设置环境变量，确保子进程使用当前虚拟环境
+        env = os.environ.copy()
+        env["PYTHONPATH"] = BACKEND_DIR
+        result = subprocess.run(cmd, capture_output=True, text=True, check=True, cwd=BACKEND_DIR, env=env)
         return {"success": True, "stdout": result.stdout, "stderr": result.stderr}
     except subprocess.CalledProcessError as e:
         return {"success": False, "stdout": e.stdout, "stderr": e.stderr}
@@ -316,6 +354,17 @@ class BacktestRequest(BaseModel):
     strategy: str = "sma_cross"
     strategy_params: Dict = {}
     initial_capital: float = 10000.0
+
+
+class FuturesBacktestRequest(BaseModel):
+    symbol: str = "BTC/USDT"
+    timeframe: str = "1h"
+    start_date: Optional[str] = None
+    end_date: Optional[str] = None
+    strategy: str = "sma_cross"
+    strategy_params: Dict = {}
+    initial_capital: float = 10000.0
+    leverage: int = 10
 
 
 # ===================== API 路由 =====================
@@ -426,6 +475,12 @@ def scheduler_list_tasks():
     return {"tasks": task_registry.list_tasks()}
 
 
+@app.post("/api/scheduler/tasks/{task_id}/execute")
+def scheduler_execute_task(task_id: str):
+    """立即执行指定定时任务"""
+    return task_registry.execute_now(task_id)
+
+
 # ---- 回测 ----
 
 @app.get("/api/strategies")
@@ -437,6 +492,45 @@ def list_strategies():
         if info:
             result.append(info)
     return {"strategies": result}
+
+
+@app.post("/api/strategies")
+def create_strategy_api(strategy_data: dict):
+    """创建自定义策略"""
+    try:
+        success = add_custom_strategy(strategy_data)
+        if success:
+            return {"success": True, "message": "策略创建成功"}
+        else:
+            return {"success": False, "message": "策略创建失败"}
+    except Exception as e:
+        return {"success": False, "message": str(e)}
+
+
+@app.put("/api/strategies/{name}")
+def update_strategy_api(name: str, strategy_data: dict):
+    """更新自定义策略"""
+    try:
+        success = update_custom_strategy(name, strategy_data)
+        if success:
+            return {"success": True, "message": "策略更新成功"}
+        else:
+            return {"success": False, "message": "策略不存在或更新失败"}
+    except Exception as e:
+        return {"success": False, "message": str(e)}
+
+
+@app.delete("/api/strategies/{name}")
+def delete_strategy_api(name: str):
+    """删除自定义策略"""
+    try:
+        success = delete_custom_strategy(name)
+        if success:
+            return {"success": True, "message": "策略删除成功"}
+        else:
+            return {"success": False, "message": "策略不存在或删除失败"}
+    except Exception as e:
+        return {"success": False, "message": str(e)}
 
 
 @app.post("/api/backtest")
@@ -458,6 +552,38 @@ def run_backtest(req: BacktestRequest):
             end_date=req.end_date or None,
             initial_capital=req.initial_capital,
             commission_rate=0.001,
+        )
+        result = engine.run(strategy)
+        return {
+            "success": True,
+            "summary": result.summary,
+            "equity_curve": result.equity_curve,
+            "trades": [t.to_dict() for t in result.trades],
+        }
+    except Exception as e:
+        return {"success": False, "message": str(e)}
+
+
+@app.post("/api/futures_backtest")
+def run_futures_backtest(req: FuturesBacktestRequest):
+    """运行合约策略回测"""
+    # 构建文件路径
+    safe_symbol = req.symbol.replace("/", "_")
+    filename = f"{safe_symbol}_ohlcv_{req.timeframe}.csv"
+    filepath = os.path.join(DATA_DIR, filename)
+
+    if not os.path.exists(filepath):
+        return {"success": False, "message": f"数据文件不存在: {filename}"}
+
+    try:
+        strategy = create_strategy(req.strategy, **req.strategy_params)
+        engine = FuturesBacktestEngine(
+            data_path=filepath,
+            start_date=req.start_date or None,
+            end_date=req.end_date or None,
+            initial_capital=req.initial_capital,
+            commission_rate=0.001,
+            leverage=req.leverage,
         )
         result = engine.run(strategy)
         return {

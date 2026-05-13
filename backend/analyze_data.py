@@ -633,6 +633,11 @@ def generate_prompt(data: dict) -> str:
     "stop_loss": 0.3200,
     "reason": "KDJ金叉+MACD多头，价格接近布林下轨支撑，RSI中性偏多"
 }}
+
+注意：
+- 如果建议"观望"，请将 entry_price、take_profit、stop_loss 设置为 0（不要用 null）
+- reason 字段必须完整描述分析理由，不要截断
+- 所有价格必须是数字类型，不能是 null
 """
     return prompt
 
@@ -660,9 +665,8 @@ def call_deepseek(prompt: str, api_key: str = None, model: str = "deepseek-v4-pr
             {"role": "system", "content": "你是一位专业的加密货币量化分析师，擅长技术分析和短线交易决策。你只输出 JSON，不输出任何额外文字。"},
             {"role": "user", "content": prompt},
         ],
-        "temperature": 0,
-        "seed": 42,
-        "max_tokens": 512,
+        "temperature": 0.3,
+        "max_tokens": 262144,
     }
 
     try:
@@ -676,18 +680,91 @@ def call_deepseek(prompt: str, api_key: str = None, model: str = "deepseek-v4-pr
             result = json.loads(resp.read().decode("utf-8"))
 
         content = result["choices"][0]["message"]["content"]
-        # 尝试从 content 中提取 JSON
+        
+        # 清理 markdown 代码块
+        if "```json" in content:
+            content = content.split("```json")[1].split("```")[0].strip()
+        elif "```" in content:
+            content = content.split("```")[1].split("```")[0].strip()
+        
+        # 尝试解析 JSON
         try:
-            # 如果 content 被 markdown 代码块包裹，先去掉
-            if "```json" in content:
-                content = content.split("```json")[1].split("```")[0].strip()
-            elif "```" in content:
-                content = content.split("```")[1].split("```")[0].strip()
             advice = json.loads(content)
-        except Exception:
-            advice = {"raw_response": content}
-
-        return advice
+            # 处理 null 值：如果是观望，设置价格为 0
+            if advice.get('direction') == '观望' or advice.get('direction') == 'N/A':
+                advice['entry_price'] = advice.get('entry_price') or 0
+                advice['take_profit'] = advice.get('take_profit') or 0
+                advice['stop_loss'] = advice.get('stop_loss') or 0
+            return advice
+        except json.JSONDecodeError as e:
+            print(f"\n[WARN] JSON 解析失败: {e}")
+            print(f"[DEBUG] 原始内容 (前500字符):\n{content[:500]}")
+            
+            # 尝试更宽松的解析：查找 { } 之间的内容
+            try:
+                start = content.find('{')
+                end = content.rfind('}')
+                if start != -1 and end != -1 and end > start:
+                    json_str = content[start:end+1]
+                    # 修复可能的截断问题：确保 JSON 完整
+                    if json_str.count('{') == json_str.count('}') and json_str.count('"') % 2 == 0:
+                        advice = json.loads(json_str)
+                        # 处理 null 值
+                        if advice.get('direction') == '观望' or advice.get('direction') == 'N/A':
+                            advice['entry_price'] = advice.get('entry_price') or 0
+                            advice['take_profit'] = advice.get('take_profit') or 0
+                            advice['stop_loss'] = advice.get('stop_loss') or 0
+                        print("[OK] 通过宽松模式成功解析 JSON")
+                        return advice
+            except Exception as e2:
+                print(f"[WARN] 宽松解析也失败: {e2}")
+            
+            # 最后手段：正则提取关键字段
+            import re
+            advice = {
+                "direction": "N/A",
+                "entry_price": 0,
+                "take_profit": 0,
+                "stop_loss": 0,
+                "reason": ""
+            }
+            
+            # 提取 direction
+            dir_match = re.search(r'["\']direction["\']\s*:\s*["\']([^"\']+)["\']', content)
+            if dir_match:
+                advice["direction"] = dir_match.group(1)
+            
+            # 提取数值（包括 null 转为 0）
+            entry_match = re.search(r'["\']entry_price["\']\s*:\s*(null|([0-9.]+))', content)
+            if entry_match and entry_match.group(2):
+                advice["entry_price"] = float(entry_match.group(2))
+            
+            tp_match = re.search(r'["\']take_profit["\']\s*:\s*(null|([0-9.]+))', content)
+            if tp_match and tp_match.group(2):
+                advice["take_profit"] = float(tp_match.group(2))
+            
+            sl_match = re.search(r'["\']stop_loss["\']\s*:\s*(null|([0-9.]+))', content)
+            if sl_match and sl_match.group(2):
+                advice["stop_loss"] = float(sl_match.group(2))
+            
+            # 提取 reason（处理截断）
+            reason_match = re.search(r'["\']reason["\']\s*:\s*["\']([^"\']+)', content)
+            if reason_match:
+                advice["reason"] = reason_match.group(1)
+            
+            # 如果方向是观望，确保价格都是 0
+            if advice["direction"] == "观望":
+                advice["entry_price"] = 0
+                advice["take_profit"] = 0
+                advice["stop_loss"] = 0
+            
+            if advice["reason"]:
+                print(f"[OK] 通过正则提取成功: direction={advice['direction']}")
+            else:
+                print(f"[WARN] 正则提取也失败，使用原始内容")
+                advice["reason"] = content[:200]
+            
+            return advice
 
     except urllib.error.HTTPError as e:
         print(f"\n[ERR] DeepSeek API HTTP 错误: {e.code}")
@@ -735,16 +812,18 @@ def analyze_symbol_timeframe(symbol: str, timeframe: str, use_deepseek: bool = F
             print(f"\n{'=' * 60}")
             print(" DeepSeek 交易建议")
             print(f"{'=' * 60}")
-            if "direction" in advice:
-                print(f" 交易方向 : {advice.get('direction', 'N/A')}")
-                print(f" 建议开仓价: {advice.get('entry_price', 'N/A')}")
-                print(f" 建议止盈价: {advice.get('take_profit', 'N/A')}")
-                print(f" 建议止损价: {advice.get('stop_loss', 'N/A')}")
-                print(f" 理由     : {advice.get('reason', 'N/A')}")
-            else:
-                # 非结构化输出
-                for k, v in advice.items():
-                    print(f" {k}: {v}")
+            # 统一使用中文键名，方便前端解析
+            direction = advice.get('direction', advice.get('方向', 'N/A'))
+            entry_price = advice.get('entry_price', advice.get('开仓价', 'N/A'))
+            take_profit = advice.get('take_profit', advice.get('止盈价', 'N/A'))
+            stop_loss = advice.get('stop_loss', advice.get('止损价', 'N/A'))
+            reason = advice.get('reason', advice.get('理由', 'N/A'))
+            
+            print(f" 交易方向 : {direction}")
+            print(f" 建议开仓价: {entry_price}")
+            print(f" 建议止盈价: {take_profit}")
+            print(f" 建议止损价: {stop_loss}")
+            print(f" 理由     : {reason}")
             print(f"{'=' * 60}")
 
 

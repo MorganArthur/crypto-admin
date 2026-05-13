@@ -58,6 +58,7 @@ export interface SchedulerTask {
 export interface StrategyInfo {
   name: string;
   description: string;
+  type?: 'spot' | 'futures';
   params_schema: Record<string, {
     type: string;
     default: number | string;
@@ -75,6 +76,10 @@ export interface BacktestRequest {
   strategy: string;
   strategy_params: Record<string, number | string>;
   initial_capital: number;
+}
+
+export interface FuturesBacktestRequest extends BacktestRequest {
+  leverage: number;
 }
 
 export interface BacktestSummary {
@@ -135,11 +140,26 @@ export const schedulerStopTask = (taskId: string) =>
 export const schedulerDeleteTask = (taskId: string) =>
   api.delete<{ success: boolean; message: string }>(`/api/scheduler/tasks/${taskId}`);
 
+export const schedulerExecuteTask = (taskId: string) =>
+  api.post<{ success: boolean; message: string }>(`/api/scheduler/tasks/${taskId}/execute`);
+
 export const schedulerListTasks = () =>
   api.get<{ tasks: SchedulerTask[] }>("/api/scheduler/tasks");
 
 export const listStrategies = () =>
   api.get<{ strategies: StrategyInfo[] }>("/api/strategies");
+
+export const createStrategy = (strategyData: Omit<StrategyInfo, 'name'>) =>
+  api.post<{ success: boolean; message: string }>("/api/strategies", strategyData);
+
+export const updateStrategy = (name: string, strategyData: Omit<StrategyInfo, 'name'>) =>
+  api.put<{ success: boolean; message: string }>(`/api/strategies/${name}`, strategyData);
+
+export const deleteStrategy = (name: string) =>
+  api.delete<{ success: boolean; message: string }>(`/api/strategies/${name}`);
+
+export const runFuturesBacktest = (req: FuturesBacktestRequest) =>
+  api.post<BacktestResult>("/api/futures_backtest", req);
 
 export const runBacktest = (req: BacktestRequest) =>
   api.post<BacktestResult>("/api/backtest", req);

@@ -59,11 +59,42 @@ def fetch_tickers(symbol: Optional[str] = None) -> pd.DataFrame:
     - symbol 为 None 时获取交易所全部交易对
     - symbol 指定时获取单个交易对
     """
-    exchange = ccxt.binance({'enableRateLimit': True})
-    exchange.load_markets()
-
+    # 创建交易所实例，设置超时和重试
+    exchange = ccxt.binance({
+        'enableRateLimit': True,
+        'timeout': 30000,  # 30秒超时
+        'options': {
+            'recvWindow': 50000,  # 接收窗口
+        },
+    })
+    
+    max_retries = 3
+    for attempt in range(max_retries):
+        try:
+            exchange.load_markets()
+            break
+        except ccxt.NetworkError as e:
+            if attempt == max_retries - 1:
+                raise
+            print(f"[WARN] 加载市场失败 (尝试 {attempt + 1}/{max_retries}): {e}")
+            import time
+            time.sleep(2 ** attempt)  # 指数退避
+    
+    import time
+    
     if symbol:
-        ticker = exchange.fetch_ticker(symbol)
+        max_retries = 3
+        ticker = None
+        for attempt in range(max_retries):
+            try:
+                ticker = exchange.fetch_ticker(symbol)
+                break
+            except ccxt.NetworkError as e:
+                if attempt == max_retries - 1:
+                    raise
+                print(f"[WARN] 获取 {symbol} ticker 失败 (尝试 {attempt + 1}/{max_retries}): {e}")
+                time.sleep(2 ** attempt)
+        
         data = [{
             '交易对': ticker['symbol'],
             '时间戳': ticker['timestamp'],
@@ -86,7 +117,18 @@ def fetch_tickers(symbol: Optional[str] = None) -> pd.DataFrame:
             '计价币成交量': ticker['quoteVolume'],
         }]
     else:
-        tickers = exchange.fetch_tickers()
+        max_retries = 3
+        tickers = None
+        for attempt in range(max_retries):
+            try:
+                tickers = exchange.fetch_tickers()
+                break
+            except ccxt.NetworkError as e:
+                if attempt == max_retries - 1:
+                    raise
+                print(f"[WARN] 获取所有 ticker 失败 (尝试 {attempt + 1}/{max_retries}): {e}")
+                time.sleep(2 ** attempt)
+        
         data = []
         for sym, t in tickers.items():
             data.append({
@@ -114,28 +156,48 @@ def fetch_ohlcv(symbol: str, timeframe: str = '1h', since: Optional[int] = None)
     :param timeframe: 时间周期, 如 '1m', '5m', '15m', '1h', '4h', '1d', '1w'
     :param since: 起始时间戳（毫秒），若提供则从该时间开始获取数据（支持分页）
     """
-    exchange = ccxt.binance({'enableRateLimit': True})
-    exchange.load_markets()
+    import time
+    exchange = ccxt.binance({'enableRateLimit': True, 'timeout': 30000})
+    
+    max_retries = 3
+    for attempt in range(max_retries):
+        try:
+            exchange.load_markets()
+            break
+        except ccxt.NetworkError as e:
+            if attempt == max_retries - 1:
+                raise
+            print(f"[WARN] 加载市场失败 (尝试 {attempt + 1}/{max_retries}): {e}")
+            time.sleep(2 ** attempt)
 
     if symbol not in exchange.symbols:
         raise ValueError(f"交易所 binance 不支持交易对 {symbol}")
 
-    if since is None:
-        ohlcv = exchange.fetch_ohlcv(symbol, timeframe=timeframe, limit=1000)
-    else:
-        # 分页获取，从 since 时间开始拉取到最新
-        all_ohlcv = []
-        current_since = since
-        while True:
-            batch = exchange.fetch_ohlcv(symbol, timeframe=timeframe, limit=1000, since=current_since)
-            if not batch:
-                break
-            all_ohlcv.extend(batch)
-            if len(batch) < 1000:
-                break
-            # 使用最后一条时间戳 + 1ms 作为下一页起点，避免重复
-            current_since = batch[-1][0] + 1
-        ohlcv = all_ohlcv
+    max_retries = 3
+    for attempt in range(max_retries):
+        try:
+            if since is None:
+                ohlcv = exchange.fetch_ohlcv(symbol, timeframe=timeframe, limit=1000)
+            else:
+                # 分页获取，从 since 时间开始拉取到最新
+                all_ohlcv = []
+                current_since = since
+                while True:
+                    batch = exchange.fetch_ohlcv(symbol, timeframe=timeframe, limit=1000, since=current_since)
+                    if not batch:
+                        break
+                    all_ohlcv.extend(batch)
+                    if len(batch) < 1000:
+                        break
+                    # 使用最后一条时间戳 + 1ms 作为下一页起点，避免重复
+                    current_since = batch[-1][0] + 1
+                ohlcv = all_ohlcv
+            break
+        except ccxt.NetworkError as e:
+            if attempt == max_retries - 1:
+                raise
+            print(f"[WARN] 获取 K线失败 (尝试 {attempt + 1}/{max_retries}): {e}")
+            time.sleep(2 ** attempt)
 
     df = pd.DataFrame(ohlcv, columns=['时间戳', '开盘价', '最高价', '最低价', '收盘价', '成交量'])
     df['时间'] = pd.to_datetime(df['时间戳'], unit='ms')
@@ -152,13 +214,33 @@ def fetch_order_book(symbol: str) -> pd.DataFrame:
     获取订单簿数据 (Order Book)
     返回 bids 和 asks 合并的 DataFrame
     """
-    exchange = ccxt.binance({'enableRateLimit': True})
-    exchange.load_markets()
+    import time
+    exchange = ccxt.binance({'enableRateLimit': True, 'timeout': 30000})
+    
+    max_retries = 3
+    for attempt in range(max_retries):
+        try:
+            exchange.load_markets()
+            break
+        except ccxt.NetworkError as e:
+            if attempt == max_retries - 1:
+                raise
+            print(f"[WARN] 加载市场失败 (尝试 {attempt + 1}/{max_retries}): {e}")
+            time.sleep(2 ** attempt)
 
     if symbol not in exchange.symbols:
         raise ValueError(f"交易所 binance 不支持交易对 {symbol}")
 
-    order_book = exchange.fetch_order_book(symbol, limit=1000)
+    max_retries = 3
+    for attempt in range(max_retries):
+        try:
+            order_book = exchange.fetch_order_book(symbol, limit=1000)
+            break
+        except ccxt.NetworkError as e:
+            if attempt == max_retries - 1:
+                raise
+            print(f"[WARN] 获取订单簿失败 (尝试 {attempt + 1}/{max_retries}): {e}")
+            time.sleep(2 ** attempt)
 
     rows = []
     for i, (price, amount) in enumerate(order_book['bids'][:1000]):
@@ -190,13 +272,33 @@ def fetch_trades(symbol: str) -> pd.DataFrame:
     """
     获取最近成交记录
     """
-    exchange = ccxt.binance({'enableRateLimit': True})
-    exchange.load_markets()
+    import time
+    exchange = ccxt.binance({'enableRateLimit': True, 'timeout': 30000})
+    
+    max_retries = 3
+    for attempt in range(max_retries):
+        try:
+            exchange.load_markets()
+            break
+        except ccxt.NetworkError as e:
+            if attempt == max_retries - 1:
+                raise
+            print(f"[WARN] 加载市场失败 (尝试 {attempt + 1}/{max_retries}): {e}")
+            time.sleep(2 ** attempt)
 
     if symbol not in exchange.symbols:
         raise ValueError(f"交易所 binance 不支持交易对 {symbol}")
 
-    trades = exchange.fetch_trades(symbol, limit=1000)
+    max_retries = 3
+    for attempt in range(max_retries):
+        try:
+            trades = exchange.fetch_trades(symbol, limit=1000)
+            break
+        except ccxt.NetworkError as e:
+            if attempt == max_retries - 1:
+                raise
+            print(f"[WARN] 获取成交记录失败 (尝试 {attempt + 1}/{max_retries}): {e}")
+            time.sleep(2 ** attempt)
 
     data = []
     for t in trades:

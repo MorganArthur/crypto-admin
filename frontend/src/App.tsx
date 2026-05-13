@@ -5,16 +5,20 @@ import {
   ClockCircleOutlined,
   BarChartOutlined,
   LineChartOutlined,
+  SettingOutlined,
+  SwapOutlined,
 } from '@ant-design/icons'
 import DataView from './components/DataView'
 import SchedulerPanel from './components/SchedulerPanel'
 import AnalyzePanel from './components/AnalyzePanel'
 import BacktestPanel from './components/BacktestPanel'
+import StrategyPanel from './components/StrategyPanel'
+import FuturesBacktestPanel from './components/FuturesBacktestPanel'
 
 const { Sider, Content } = Layout
 const { Title } = Typography
 
-type MenuKey = 'data' | 'scheduler' | 'analyze' | 'backtest'
+type MenuKey = 'data' | 'scheduler' | 'analyze' | 'backtest' | 'strategy' | 'futures_backtest'
 
 function App() {
   const [activeKey, setActiveKey] = useState<MenuKey>('data')
@@ -29,6 +33,10 @@ function App() {
         return <AnalyzePanel />
       case 'backtest':
         return <BacktestPanel />
+      case 'strategy':
+        return <StrategyPanel />
+      case 'futures_backtest':
+        return <FuturesBacktestPanel />
       default:
         return <DataView />
     }
@@ -61,9 +69,19 @@ function App() {
               label: '数据分析',
             },
             {
+              key: 'strategy',
+              icon: <SettingOutlined />,
+              label: '策略管理',
+            },
+            {
               key: 'backtest',
               icon: <LineChartOutlined />,
-              label: '策略回测',
+              label: '现货回测',
+            },
+            {
+              key: 'futures_backtest',
+              icon: <SwapOutlined />,
+              label: '合约回测',
             },
           ]}
         />

@@ -144,9 +144,50 @@ class RsiStrategy(BaseStrategy):
         return Signal.HOLD
 
 
+class FuturesSmaCrossStrategy(BaseStrategy):
+    """
+    合约双均线交叉策略
+    支持做多和做空
+    """
+    name = "futures_sma_cross"
+    description = "合约双均线交叉策略"
+    type = "futures"
+    params_schema = {
+        "short_period": {"type": "int", "default": 10, "min": 2, "max": 100, "label": "短期均线周期"},
+        "long_period": {"type": "int", "default": 30, "min": 5, "max": 200, "label": "长期均线周期"},
+    }
+
+    def _calculate_indicators(self):
+        sp = self.params.get("short_period", 10)
+        lp = self.params.get("long_period", 30)
+        self.df["sma_short"] = self.df["close"].rolling(window=sp).mean()
+        self.df["sma_long"] = self.df["close"].rolling(window=lp).mean()
+
+    def next(self, i: int) -> int:
+        if i < 1:
+            return Signal.HOLD
+        short_prev = self.df["sma_short"].iloc[i - 1]
+        long_prev = self.df["sma_long"].iloc[i - 1]
+        short_curr = self.df["sma_short"].iloc[i]
+        long_curr = self.df["sma_long"].iloc[i]
+
+        if pd.isna(short_prev) or pd.isna(long_prev):
+            return Signal.HOLD
+
+        # 金叉 - 做多
+        if short_prev <= long_prev and short_curr > long_curr:
+            return Signal.BUY
+        # 死叉 - 做空
+        if short_prev >= long_prev and short_curr < long_curr:
+            return Signal.SELL
+
+        return Signal.HOLD
+
+
 # ===================== 策略注册中心 =====================
 
 STRATEGY_REGISTRY: Dict[str, type] = {}
+STRATEGY_STORAGE: Dict[str, Dict] = {}  # 用于存储自定义策略信息
 
 
 def register_strategy(cls: type):
@@ -156,6 +197,7 @@ def register_strategy(cls: type):
 
 register_strategy(SmaCrossStrategy)
 register_strategy(RsiStrategy)
+register_strategy(FuturesSmaCrossStrategy)
 
 
 def get_strategy_names() -> List[str]:
@@ -166,17 +208,63 @@ def get_strategy_info(name: str) -> Optional[Dict]:
     cls = STRATEGY_REGISTRY.get(name)
     if not cls:
         return None
-    return {
+    info = {
         "name": cls.name,
         "description": cls.description,
+        "type": getattr(cls, 'type', 'spot'),  # 读取策略类的type属性，默认为spot
         "params_schema": cls.params_schema,
     }
+    # 如果有自定义策略信息，合并进去（自定义信息优先）
+    if name in STRATEGY_STORAGE:
+        custom_info = STRATEGY_STORAGE[name]
+        # type字段如果自定义了，就覆盖默认的
+        if 'type' in custom_info:
+            info['type'] = custom_info['type']
+        # 其他字段也合并
+        for key, value in custom_info.items():
+            if key != 'type':  # type已经处理过了
+                info[key] = value
+    return info
 
 
 def create_strategy(name: str, **params) -> BaseStrategy:
     if name not in STRATEGY_REGISTRY:
         raise ValueError(f"未知策略: {name}，可用策略: {list(STRATEGY_REGISTRY.keys())}")
     return STRATEGY_REGISTRY[name](**params)
+
+
+def add_custom_strategy(strategy_data: Dict) -> bool:
+    """添加自定义策略到存储中"""
+    name = strategy_data.get("name")
+    if not name:
+        return False
+    
+    STRATEGY_STORAGE[name] = strategy_data
+    return True
+
+
+def update_custom_strategy(name: str, strategy_data: Dict) -> bool:
+    """更新策略（包括内置策略和自定义策略）"""
+    # 检查策略是否存在（内置或自定义）
+    if name not in STRATEGY_REGISTRY and name not in STRATEGY_STORAGE:
+        return False
+    
+    # 如果策略不存在于STRATEGY_STORAGE中，先创建
+    if name not in STRATEGY_STORAGE:
+        STRATEGY_STORAGE[name] = {}
+    
+    # 更新策略信息
+    STRATEGY_STORAGE[name].update(strategy_data)
+    return True
+
+
+def delete_custom_strategy(name: str) -> bool:
+    """删除自定义策略"""
+    if name not in STRATEGY_STORAGE:
+        return False
+    
+    del STRATEGY_STORAGE[name]
+    return True
 
 
 # ===================== 回测引擎 =====================

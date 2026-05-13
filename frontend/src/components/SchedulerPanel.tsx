@@ -22,11 +22,13 @@ import {
   ClockCircleOutlined,
   ReloadOutlined,
   DeleteOutlined,
+  PlayCircleOutlined,
 } from "@ant-design/icons";
 import {
   schedulerCreate,
   schedulerStopTask,
   schedulerDeleteTask,
+  schedulerExecuteTask,
   schedulerListTasks,
 } from "../api";
 import type { SchedulerTask } from "../api";
@@ -117,6 +119,20 @@ const SchedulerPanel: React.FC = () => {
       await fetchTasks();
     } catch (e) {
       message.error("删除任务失败");
+    }
+  };
+
+  const handleExecuteNow = async (taskId: string) => {
+    try {
+      const res = await schedulerExecuteTask(taskId);
+      if (res.data.success) {
+        message.success(res.data.message);
+      } else {
+        message.warning(res.data.message);
+      }
+      await fetchTasks();
+    } catch (e) {
+      message.error("执行任务失败");
     }
   };
 
@@ -276,6 +292,14 @@ const SchedulerPanel: React.FC = () => {
                   }
                   extra={
                     <Space>
+                      <Button
+                        size="small"
+                        type="primary"
+                        icon={<PlayCircleOutlined />}
+                        onClick={() => handleExecuteNow(task.task_id)}
+                      >
+                        立即执行
+                      </Button>
                       {task.running && (
                         <Button
                           size="small"

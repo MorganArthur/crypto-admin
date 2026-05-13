@@ -39,7 +39,7 @@ if %errorlevel% neq 0 (
 )
 
 echo [2/3] Starting backend service (FastAPI)...
-start "Crypto Admin - Backend" cmd /k "cd backend && python api_server.py"
+start "Crypto Admin - Backend" cmd /k "cd backend && ..\venv\Scripts\activate && python api_server.py"
 
 echo Waiting for backend service to start...
 timeout /t 5 /nobreak >nul
